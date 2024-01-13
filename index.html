@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulasi Pembiayaan</title>
+    <style>
+      /* Add your CSS styles here */
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f2f2f2;
+      }
+      img {
+        max-width: 150px;
+      }
+      .calculator {
+        max-width: 400px;
+        margin: 0 auto;
+        padding: 30px;
+        background-color: #fff;
+        border-radius: 15px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+      }
+      label {
+        display: flex;
+        margin-bottom: 10px;
+      }
+      select,
+      input[type='text'] {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        background-color: #007bff;
+        color: #fff;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #result {
+        margin-top: 15px;
+        font-weight: bold;
+      }
+      #submitBtn {
+        display: none;
+        background-color: #1bb00d;
+        cursor: pointer;
+        margin-top: 12px; /* Tambahkan jarak atas */
+        margin-bottom: 6px; /* Tambahkan jarak bawah */
+        width: 100%; /* Mengisi lebar penuh */
+        box-sizing: border-box; /* Memastikan padding dan border tidak menambah lebar */
+      }
+      @media only screen and (max-width: 600px) {
+        .calculator {
+          max-width: 100%;
+        }
+      }
+      
+    </style>
+  </head>
+  <body>
+    <script>
+        // Format nilai uang ke dalam format akuntansi
+        const formatCurrency = (input) => {
+            let value = input.value.replace(/[^\d]/g, ''); // Hapus karakter selain digit
+            if (!isNaN(value)) {
+            value = parseFloat(value);
+            input.value = `Rp ${value.toLocaleString('id-ID')}`;
+            }
+        };
+
+        // Fungsi untuk mengonversi nilai akuntansi rupiah ke float
+        const convertToFloat = (input) => {
+            return parseFloat(input.replace(/[^\d]/g, ''));
+        };
+
+        // Menambahkan event listener untuk memformat nilai saat pengguna memasukkan angka
+        document.getElementById('monthlyIncome').addEventListener('input', function() {
+            formatCurrency(this);
+        });
+
+        document.getElementById('loanAmount').addEventListener('input', function() {
+            formatCurrency(this);
+        });
+    </script>
+    <div class="calculator">
+      <img src="assets/logoBSI.png" />
+      <h2>
+        Simulasi Pembiayaan <br />
+        Mitraguna Berkah BSI
+      </h2>
+      <form id="loanForm" action="https://script.google.com/macros/s/AKfycbwAlIwBOlLX2aVXZpXOV4BG7avMcer0RF18GIzGP5Kc3zpw5D1-tq9bz7B5W-qjH37DQg/exec" method="post">
+        <label for="userId">Nomor KTP:</label>
+        <input type="text" name="ID" id="userId" required />
+
+        <label for="monthlyIncome">Penghasilan bulanan (Rp.):</label>
+        <input type="text" name="Pendapatan" id="monthlyIncome" oninput="formatCurrency(this)" required />
+
+        <label for="loanAmount">Plafon (Jumlah pembiayaan):</label>
+        <input type="text" name="Plafon" id="loanAmount" oninput="formatCurrency(this)" required />
+
+        <label for="numPayments">Tenor (bulan):</label>
+        <input type="text" name="Tenor" id="numPayments" required />
+
+        <label for="priceSelection">Price</label>
+        <select id="priceSelection" name="Price">
+          <option value="regular">Regular</option>
+          <option value="promo">Promo</option>
+        </select>
+
+        <button type="button" onclick="calculateLoan()">Simulasikan!</button>
+        <div id="result"></div>
+        <button type="submit" id="submitBtn">Submit form</button>
+      </form>
+    </div>
+
+    <script>
+      function calculateLoan() {
+        const userId = document.getElementById('userId').value
+        const monthlyIncome = convertToFloat(document.getElementById('monthlyIncome').value);
+        const loanAmount = convertToFloat(document.getElementById('loanAmount').value);
+        const numPayments = parseInt(
+          document.getElementById('numPayments').value
+        )
+        const priceSelection = document.getElementById('priceSelection').value
+
+        const PMT = (rate, nper, pv, fv, type) => {
+          /*
+           * rate   - interest rate per month
+           * nper   - number of periods (months)
+           * pv   - present value
+           * fv   - future value
+           * type - when the payments are due:
+           *        0: end of the period, e.g. end of month (default)
+           *        1: beginning of period
+           */
+          let PMT, pvif
+
+          fv || (fv = 0)
+          type || (type = 0)
+
+          if (rate === 0) return -(pv + fv) / nper
+
+          pvif = Math.pow(1 + rate, nper)
+          PMT = (-rate * (pv * pvif + fv)) / (pvif - 1)
+
+          if (type === 1) PMT /= 1 + rate
+          return PMT*(-1)
+        }
+
+        // Calculate monthly payment based on loan amount, number of payments, and price selection
+        let monthlyPayment = 0
+        if (priceSelection === 'regular') {
+          monthlyPayment = PMT(0.105 / 12, numPayments, loanAmount, 0, 0)
+        } else if (priceSelection === 'promo') {
+          monthlyPayment = PMT(0.095 / 12, numPayments, loanAmount, 0, 0)
+        }
+
+        // Check if the loan is accepted based on income and monthly payment
+        const isLoanAccepted = monthlyPayment <= 0.6 * monthlyIncome
+
+        // Display the result
+        const resultElement = document.getElementById('result')
+        if (isLoanAccepted) {
+          resultElement.innerHTML = `Pembiayaan dapat diterima dengan biaya bulanan sebesar: Rp. ${monthlyPayment.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        } else {
+          resultElement.innerHTML = `Mohon maaf pembiayaan anda kemungkinan belum bisa diterima. Pembiayan bulanan anda sebesar: Rp. ${monthlyPayment.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} yang melebihi dari 60% penghasilan bulanan Anda`;
+        }
+        
+
+        // Show the second button after calculation
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.style.display = 'block';
+      }
+    </script>
+  </body>
+</html>
